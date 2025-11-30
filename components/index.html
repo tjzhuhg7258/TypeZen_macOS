@@ -1,0 +1,907 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>TypeZen macOS</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Noto+Sans+SC:wght@300;400;500;700&display=swap" rel="stylesheet">
+    
+    <!-- 1. Import Map for Module Loading (CDN) -->
+    <script type="importmap">
+    {
+      "imports": {
+        "@google/genai": "https://esm.run/@google/genai"
+      }
+    }
+    </script>
+
+    <!-- 2. Polyfill for process.env (Browser Compatibility) -->
+    <script>
+        window.process = { 
+            env: { 
+                API_KEY: '' 
+            } 
+        };
+        
+        // Global Error Handler
+        window.onerror = function(msg, url, line, col, error) {
+            // Ignore benign resize errors or script interruptions often seen on iOS
+            if (msg.includes('ResizeObserver') || msg.includes('Script error')) return false;
+            
+            document.body.innerHTML = `
+                <div style="padding: 20px; color: red; font-family: sans-serif;">
+                    <h3>Application Error</h3>
+                    <p>${msg}</p>
+                </div>
+            `;
+            return false;
+        };
+    </script>
+
+    <!-- Tailwind Configuration -->
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
+                        chinese: ['"Noto Sans SC"', 'PingFang SC', 'Microsoft YaHei', 'sans-serif'],
+                    },
+                    colors: {
+                        mac: {
+                            bg: '#F5F5F7',
+                            window: '#FFFFFF',
+                            darkBg: '#1E1E1E',
+                            darkWindow: '#2C2C2C',
+                            blue: '#007AFF',
+                            red: '#FF3B30',
+                            green: '#34C759',
+                            yellow: '#FFCC00',
+                            gray: '#8E8E93',
+                        }
+                    },
+                    animation: {
+                        'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                        'slide-up': 'slideUp 0.4s ease-out forwards',
+                        'fade-in': 'fadeIn 0.3s ease-out forwards',
+                    },
+                    keyframes: {
+                        slideUp: {
+                            '0%': { opacity: '0', transform: 'translateY(10px)' },
+                            '100%': { opacity: '1', transform: 'translateY(0)' },
+                        },
+                        fadeIn: {
+                            '0%': { opacity: '0' },
+                            '100%': { opacity: '1' },
+                        }
+                    }
+                },
+            },
+        }
+    </script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            -webkit-font-smoothing: antialiased;
+            overscroll-behavior: none; /* Prevent bounce on Mac/iOS */
+        }
+        .chinese-text {
+            font-family: 'Noto Sans SC', sans-serif;
+        }
+        /* Hidden input configuration */
+        #hidden-input {
+            position: absolute;
+            opacity: 0; 
+            width: 1rem;
+            height: 1.5rem;
+            padding: 0;
+            border: none;
+            margin: 0;
+            z-index: 0;
+            pointer-events: none; 
+            caret-color: transparent; 
+        }
+        
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background-color: rgba(156, 163, 175, 0.3);
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background-color: rgba(107, 114, 128, 0.6);
+        }
+
+        .char-unit {
+            backface-visibility: hidden; 
+            position: relative;
+        }
+    </style>
+</head>
+<body class="bg-mac-bg dark:bg-mac-darkBg text-gray-900 dark:text-gray-100 transition-colors duration-300 min-h-screen flex items-center justify-center p-4">
+
+    <!-- App Container -->
+    <div id="app" class="w-full max-w-5xl mx-auto h-full flex flex-col justify-center">
+        
+        <!-- Header -->
+        <div class="text-center mb-6 shrink-0">
+            <h1 class="text-3xl font-bold tracking-tight mb-2">TypeZen <span class="text-mac-blue">macOS</span></h1>
+            <p class="text-sm text-gray-500 dark:text-gray-400">AI 驱动的原生中文打字练习</p>
+        </div>
+
+        <!-- Mac Window -->
+        <div class="bg-mac-window dark:bg-mac-darkWindow rounded-xl shadow-2xl overflow-hidden border border-gray-200 dark:border-gray-800 transition-all duration-300 backdrop-blur-xl relative h-[80vh] min-h-[600px] flex flex-col">
+            
+            <!-- Window Title Bar -->
+            <div class="h-10 bg-gray-100/50 dark:bg-gray-800/50 border-b border-gray-200 dark:border-gray-700 flex items-center px-4 justify-between select-none shrink-0">
+                <div class="flex gap-2">
+                    <div class="w-3 h-3 rounded-full bg-mac-red hover:bg-red-600 shadow-sm"></div>
+                    <div class="w-3 h-3 rounded-full bg-mac-yellow hover:bg-yellow-500 shadow-sm"></div>
+                    <div class="w-3 h-3 rounded-full bg-mac-green hover:bg-green-600 shadow-sm"></div>
+                </div>
+                <div class="text-xs font-semibold text-gray-500 dark:text-gray-400 truncate max-w-[300px]" id="window-title">准备就绪</div>
+                <button id="theme-toggle" class="p-1.5 rounded-md hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors text-gray-500">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path></svg>
+                </button>
+            </div>
+
+            <!-- Content Area -->
+            <div class="flex-1 relative flex flex-col p-6 sm:p-8 overflow-hidden" id="main-content">
+                <div class="flex items-center justify-center h-full text-gray-400">正在加载资源...</div>
+            </div>
+            
+            <!-- Footer -->
+            <div class="h-8 bg-gray-50 dark:bg-gray-900/30 border-t border-gray-100 dark:border-gray-800 flex items-center justify-center text-xs text-gray-400 gap-6 select-none shrink-0">
+                <span><kbd class="font-mono bg-gray-200 dark:bg-gray-700 px-1 rounded">Enter</kbd> 确认</span>
+                <span><kbd class="font-mono bg-gray-200 dark:bg-gray-700 px-1 rounded">Esc</kbd> 暂停</span>
+                <span><kbd class="font-mono bg-gray-200 dark:bg-gray-700 px-1 rounded">Space</kbd> 继续</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- App Logic -->
+    <script type="module">
+        import { GoogleGenAI } from "@google/genai";
+
+        let ai = null;
+
+        // Fallback data in case AI fails or no key is provided
+        const FALLBACK_DATA = {
+            WORDS: [
+                "我们", "生活", "世界", "通过", "发展", "自己", "时候", "虽然", "但是", "因为",
+                "所以", "如果", "可能", "开始", "认为", "需要", "感觉", "告诉", "希望", "觉得",
+                "一切", "一定", "一直", "一起", "已经", "意思", "因为", "引起", "应该", "永远",
+                "科技", "创新", "未来", "智能", "数据", "网络", "连接", "系统", "程序", "设计"
+            ],
+            IDIOMS: [
+                "半途而废", "不可思议", "各抒己见", "恍然大悟", "津津有味", "精益求精", "理所当然", "全力以赴",
+                "实事求是", "随遇而安", "画蛇添足", "守株待兔", "掩耳盗铃", "亡羊补牢", "刻舟求剑"
+            ],
+            SENTENCES: [
+                "海内存知己，天涯若比邻。",
+                "三人行，必有我师焉。",
+                "学而不思则罔，思而不学则殆。",
+                "千里之行，始于足下。",
+                "欲穷千里目，更上一层楼。"
+            ]
+        };
+
+        class App {
+            constructor() {
+                const savedData = JSON.parse(localStorage.getItem('typeZen_data') || '{"history":[], "library":[]}');
+                const savedConfig = JSON.parse(localStorage.getItem('typeZen_config') || '{"fontSizeLevel": 3, "practiceLength": "MEDIUM", "userApiKey": ""}');
+
+                this.state = {
+                    view: 'menu', 
+                    tab: 'new',
+                    mode: 'WORDS',
+                    
+                    targetText: '',
+                    targetTitle: '',
+                    
+                    userInput: '',
+                    compositionText: '',
+                    status: 'IDLE',
+                    
+                    startTime: null,
+                    endTime: null,
+                    pausedDuration: 0,
+                    lastPauseTime: null,
+                    
+                    errors: 0,
+                    wpm: 0,
+                    accuracy: 100,
+                    
+                    history: savedData.history || [],
+                    library: savedData.library || [],
+                    fontSizeLevel: savedConfig.fontSizeLevel || 3,
+                    practiceLength: savedConfig.practiceLength || 'MEDIUM',
+                    userApiKey: savedConfig.userApiKey || '',
+                    
+                    isLoading: false
+                };
+                
+                this.dom = {
+                    content: document.getElementById('main-content'),
+                    title: document.getElementById('window-title'),
+                    themeToggle: document.getElementById('theme-toggle'),
+                };
+
+                this.timerInterval = null;
+                this.isComposing = false;
+
+                this.init();
+            }
+
+            init() {
+                this.renderMenu();
+                this.bindGlobalEvents();
+                this.loadTheme();
+            }
+
+            persistData() {
+                localStorage.setItem('typeZen_data', JSON.stringify({
+                    history: this.state.history,
+                    library: this.state.library
+                }));
+                localStorage.setItem('typeZen_config', JSON.stringify({
+                    fontSizeLevel: this.state.fontSizeLevel,
+                    practiceLength: this.state.practiceLength,
+                    userApiKey: this.state.userApiKey
+                }));
+            }
+
+            loadTheme() {
+                const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                if (isDark) document.documentElement.classList.add('dark');
+                this.dom.themeToggle.addEventListener('click', () => {
+                    document.documentElement.classList.toggle('dark');
+                });
+            }
+
+            bindGlobalEvents() {
+                document.addEventListener('keydown', (e) => {
+                    if (this.isComposing) return;
+
+                    if (this.state.view === 'game') {
+                        if (e.key === 'Escape') this.togglePause();
+                        if (e.code === 'Space' && this.state.status === 'PAUSED') {
+                             e.preventDefault();
+                             this.togglePause();
+                        }
+                    }
+                    if (e.key === 'Enter') {
+                        if (this.state.view === 'result') this.renderMenu();
+                        else if ((this.state.status === 'RUNNING' || this.state.status === 'PAUSED') && !this.isComposing) {
+                            this.finishGame(false);
+                        }
+                    }
+                });
+            }
+
+            // --- AI & Generation Logic ---
+
+            async ensureAI() {
+                let apiKey = this.state.userApiKey || window.process?.env?.API_KEY;
+                
+                if (!apiKey) {
+                    const inputKey = prompt("需要 Google Gemini API Key 来生成实时内容。\n\n如果没有Key，点击取消将使用内置固定词库。", "");
+                    if (inputKey && inputKey.trim() !== '') {
+                        this.state.userApiKey = inputKey.trim();
+                        apiKey = inputKey.trim();
+                        this.persistData();
+                    } else {
+                        return false; // No key provided
+                    }
+                }
+
+                if (!ai) {
+                    try {
+                        ai = new GoogleGenAI({ apiKey: apiKey });
+                    } catch (e) {
+                         alert("Key 格式错误");
+                         this.state.userApiKey = ''; 
+                         this.persistData();
+                         return false;
+                    }
+                }
+                return true;
+            }
+
+            async handleStandardMode(mode) {
+                const lenSetting = this.state.practiceLength;
+                
+                // Set loading state on UI
+                this.state.isLoading = true;
+                this.renderMenu(); // Re-render to show spinner
+
+                const hasAI = await this.ensureAI();
+
+                // If no AI key, use fallback immediately
+                if (!hasAI) {
+                    this.useFallbackData(mode, lenSetting);
+                    this.state.isLoading = false;
+                    return;
+                }
+
+                // Determine prompt params
+                let count = 20;
+                let prompt = "";
+                let title = "";
+
+                if (mode === 'WORDS') {
+                    if (lenSetting === 'SHORT') count = 20;
+                    else if (lenSetting === 'MEDIUM') count = 40;
+                    else if (lenSetting === 'LONG') count = 80;
+                    prompt = `请生成${count}个常用的中文词汇(双字或三字词)，用于打字练习。词汇之间用空格分隔。不要包含拼音、数字或标点。直接返回纯文本。`;
+                    title = `AI 随机词汇 (${count}组)`;
+                } else if (mode === 'IDIOMS') {
+                    if (lenSetting === 'SHORT') count = 10;
+                    else if (lenSetting === 'MEDIUM') count = 20;
+                    else if (lenSetting === 'LONG') count = 40;
+                    prompt = `请生成${count}个常用的四字成语。成语之间用空格分隔。不要带拼音。直接返回纯文本。`;
+                    title = `AI 四字成语 (${count}个)`;
+                } else if (mode === 'SENTENCES') {
+                    if (lenSetting === 'SHORT') count = 3;
+                    else if (lenSetting === 'MEDIUM') count = 6;
+                    else if (lenSetting === 'LONG') count = 12;
+                    prompt = `请生成${count}个优美的中文短句、诗词名句或名言。每句一行。不要带序号。直接返回纯文本。`;
+                    title = `AI 优美短句 (${count}句)`;
+                }
+
+                try {
+                    const response = await ai.models.generateContent({
+                        model: 'gemini-2.5-flash',
+                        contents: prompt,
+                    });
+                    
+                    let text = response.text.trim();
+                    // Basic cleaning
+                    if (mode === 'WORDS' || mode === 'IDIOMS') {
+                        text = text.replace(/\n/g, ' ').replace(/[、，,]/g, ' ');
+                    } else {
+                        text = text.replace(/\s+/g, ''); // Remove spaces for sentences
+                    }
+                    
+                    if (text && text.length > 5) {
+                        this.startPractice(mode, text, title);
+                    } else {
+                        throw new Error("AI 返回内容过短");
+                    }
+                } catch (error) {
+                    console.error("Generation failed", error);
+                    // Fallback silently or alert
+                    alert("AI 生成失败，将使用内置词库。(" + error.message + ")");
+                    this.useFallbackData(mode, lenSetting);
+                } finally {
+                    this.state.isLoading = false;
+                }
+            }
+
+            async handleCustomAIGenerate() {
+                const topicEl = document.getElementById('ai-topic');
+                const lengthEl = document.getElementById('ai-length');
+                const topic = topicEl.value.trim() || "科技";
+                const length = lengthEl.value;
+
+                this.state.isLoading = true;
+                // Force a minimal re-render of the button or full menu? 
+                // RenderMenu handles isLoading state generally
+                this.renderMenu(); 
+
+                const hasAI = await this.ensureAI();
+                if (!hasAI) {
+                    this.state.isLoading = false;
+                    this.renderMenu();
+                    return;
+                }
+
+                try {
+                    const prompt = `请生成一段关于"${topic}"的中文文本，用于打字练习。长度大约${length}字。内容要积极向上，流畅自然。请直接返回纯文本内容，不要包含标题、Markdown格式或其他说明。`;
+                    const response = await ai.models.generateContent({
+                        model: 'gemini-2.5-flash',
+                        contents: prompt,
+                    });
+                    const text = response.text.trim();
+                    if (text) {
+                        this.startPractice('AI', text, `${topic} - ${length}字`);
+                    } else {
+                        throw new Error("Empty response");
+                    }
+                } catch (error) {
+                    alert("生成失败: " + error.message);
+                } finally {
+                    this.state.isLoading = false;
+                    // If we didn't start practice (error), we need to re-render menu to clear loading state
+                    if (this.state.view === 'menu') this.renderMenu();
+                }
+            }
+
+            useFallbackData(mode, lenSetting) {
+                let count = 20;
+                let text = "";
+                let title = "基础练习";
+
+                if (mode === 'WORDS') {
+                    count = lenSetting === 'SHORT' ? 20 : (lenSetting === 'MEDIUM' ? 50 : 80);
+                    // Repeat random selection from fallback
+                    text = Array.from({length: count}, () => FALLBACK_DATA.WORDS[Math.floor(Math.random() * FALLBACK_DATA.WORDS.length)]).join('');
+                    title = `随机词汇 (内置)`;
+                } else if (mode === 'IDIOMS') {
+                    count = lenSetting === 'SHORT' ? 10 : (lenSetting === 'MEDIUM' ? 20 : 40);
+                    text = Array.from({length: count}, () => FALLBACK_DATA.IDIOMS[Math.floor(Math.random() * FALLBACK_DATA.IDIOMS.length)]).join('');
+                    title = `四字成语 (内置)`;
+                } else if (mode === 'SENTENCES') {
+                    count = lenSetting === 'SHORT' ? 2 : (lenSetting === 'MEDIUM' ? 5 : 10);
+                    text = Array.from({length: count}, () => FALLBACK_DATA.SENTENCES[Math.floor(Math.random() * FALLBACK_DATA.SENTENCES.length)]).join('').replace(/\s+/g, '');
+                    title = `优美短句 (内置)`;
+                }
+                this.startPractice(mode, text, title);
+            }
+
+            // --- Game Core ---
+
+            startPractice(mode, text, title) {
+                this.state.mode = mode;
+                // Pre-process text to remove common problematic characters for typing
+                this.state.targetText = text.replace(/\s+/g, '').replace(/[^\u4e00-\u9fa5，。？！：；“”‘’（）]/g, ''); 
+                this.state.targetTitle = title;
+                
+                this.state.userInput = '';
+                this.state.compositionText = '';
+                this.state.status = 'RUNNING'; 
+                this.state.startTime = Date.now();
+                this.state.pausedDuration = 0;
+                this.state.errors = 0;
+                this.state.wpm = 0;
+                this.state.accuracy = 100;
+                
+                this.state.view = 'game';
+                this.state.isLoading = false;
+                this.renderGame();
+                this.startTimer();
+            }
+
+            startTimer() {
+                if (this.timerInterval) clearInterval(this.timerInterval);
+                this.timerInterval = setInterval(() => {
+                    if (this.state.status !== 'RUNNING') return;
+                    this.updateStats();
+                }, 500);
+            }
+
+            updateStats() {
+                const now = Date.now();
+                const elapsedMin = ((now - this.state.startTime) - this.state.pausedDuration) / 1000 / 60;
+                if (elapsedMin > 0) {
+                    this.state.wpm = Math.round(this.state.userInput.length / elapsedMin);
+                }
+                
+                const wpmEl = document.getElementById('stat-wpm');
+                const accEl = document.getElementById('stat-acc');
+                const timeEl = document.getElementById('stat-time');
+                if (wpmEl) wpmEl.textContent = this.state.wpm;
+                if (accEl) accEl.textContent = this.state.accuracy + '%';
+                if (timeEl) {
+                    const sec = Math.floor(elapsedMin * 60);
+                    timeEl.textContent = `${Math.floor(sec/60)}:${(sec%60).toString().padStart(2, '0')}`;
+                }
+            }
+
+            togglePause() {
+                if (this.state.status === 'RUNNING') {
+                    this.state.status = 'PAUSED';
+                    this.state.lastPauseTime = Date.now();
+                    document.getElementById('pause-overlay').classList.remove('hidden');
+                    document.getElementById('hidden-input').blur();
+                } else if (this.state.status === 'PAUSED') {
+                    this.state.status = 'RUNNING';
+                    const pauseDuration = Date.now() - this.state.lastPauseTime;
+                    this.state.pausedDuration += pauseDuration;
+                    document.getElementById('pause-overlay').classList.add('hidden');
+                    document.getElementById('hidden-input').focus();
+                }
+            }
+
+            finishGame(completed = true) {
+                if (!completed) {
+                    this.renderMenu();
+                    return;
+                }
+                clearInterval(this.timerInterval);
+                this.state.status = 'FINISHED';
+                this.state.endTime = Date.now();
+                this.updateStats();
+
+                const elapsedSec = Math.floor(((this.state.endTime - this.state.startTime) - this.state.pausedDuration) / 1000);
+                const record = {
+                    id: Date.now(),
+                    date: new Date().toISOString(),
+                    mode: this.state.targetTitle || this.state.mode,
+                    wpm: this.state.wpm,
+                    accuracy: this.state.accuracy,
+                    errors: this.state.errors,
+                    time: elapsedSec
+                };
+                this.state.history.unshift(record);
+                if (this.state.history.length > 100) this.state.history.pop();
+                this.persistData();
+
+                this.renderResult();
+            }
+
+            handleInput(val) {
+                if (this.state.status !== 'RUNNING') return;
+                for (let i = 0; i < val.length; i++) {
+                    const char = val[i];
+                    const currentIndex = this.state.userInput.length;
+                    if (currentIndex < this.state.targetText.length) {
+                        const targetChar = this.state.targetText[currentIndex];
+                        if (char !== targetChar) this.state.errors++;
+                        this.state.userInput += char;
+                    }
+                }
+                const correct = this.state.userInput.split('').filter((c, i) => c === this.state.targetText[i]).length;
+                this.state.accuracy = this.state.userInput.length > 0 ? Math.round((correct / this.state.userInput.length) * 100) : 100;
+
+                this.renderText();
+                this.updateStats();
+
+                if (this.state.userInput.length >= this.state.targetText.length) {
+                    this.finishGame(true);
+                }
+            }
+            
+            changeFontSize(delta) {
+                const newSize = this.state.fontSizeLevel + delta;
+                if (newSize >= 1 && newSize <= 5) {
+                    this.state.fontSizeLevel = newSize;
+                    this.persistData();
+                    this.renderText();
+                    document.getElementById('font-size-display').textContent = this.state.fontSizeLevel;
+                }
+            }
+
+            setPracticeLength(level) {
+                this.state.practiceLength = level;
+                this.persistData();
+                this.renderMenu();
+            }
+
+            getAnalysis(wpm, acc) {
+                if (acc < 90) return { title: "⚠️ 建议放慢速度", content: "准确率偏低。错字会打断心流，建议放慢节奏，看准了再按键，培养正确的肌肉记忆。", color: "text-mac-red" };
+                if (wpm < 30) return { title: "🌱 初学乍练", content: "您正在建立中文输入的神经连接。建议多练习常用词组，逐步提升键位熟悉度。", color: "text-mac-green" };
+                if (wpm < 50) return { title: "📈 稳步提升", content: "速度已经不错了！可以尝试挑战成语或更长的句子，提升输入的连贯性。", color: "text-mac-blue" };
+                if (wpm < 70) return { title: "🚀 熟能生巧", content: "很棒的表现！您已经能轻松应对大多数文本。尝试通过AI生成不同主题的文章来拓宽词汇面。", color: "text-mac-blue" };
+                return { title: "🏆 运指如飞", content: "大师级的速度与准确度！保持这种状态，您已经完全掌握了高效输入的精髓。", color: "text-mac-yellow" };
+            }
+
+            saveCurrentText() {
+                const newEntry = { id: Date.now(), title: this.state.targetTitle, content: this.state.targetText, date: new Date().toISOString() };
+                this.state.library.unshift(newEntry);
+                this.persistData();
+                const btn = document.getElementById('btn-save-text');
+                if(btn) { btn.textContent = "已收藏"; btn.disabled = true; btn.classList.add('opacity-50'); }
+            }
+
+            deleteLibraryItem(id) {
+                this.state.library = this.state.library.filter(l => l.id !== id);
+                this.persistData();
+                this.renderMenu(); 
+            }
+
+            deleteHistory(id) {
+                this.state.history = this.state.history.filter(h => h.id !== id);
+                this.persistData();
+                this.renderMenu();
+            }
+
+            switchTab(tab) {
+                this.state.tab = tab;
+                this.renderMenu();
+            }
+
+            // --- Rendering ---
+
+            renderMenu() {
+                this.state.view = 'menu';
+                this.dom.title.textContent = 'TypeZen';
+                
+                const tabsHtml = `
+                    <div class="flex justify-center mb-8 shrink-0">
+                        <div class="bg-gray-100 dark:bg-gray-800 p-1 rounded-lg inline-flex relative shadow-inner">
+                            <button onclick="app.switchTab('new')" class="${this.state.tab === 'new' ? 'bg-white dark:bg-gray-600 shadow-sm text-gray-800 dark:text-white' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'} px-4 py-1.5 rounded-md text-sm font-medium transition-all duration-200">开始练习</button>
+                            <button onclick="app.switchTab('library')" class="${this.state.tab === 'library' ? 'bg-white dark:bg-gray-600 shadow-sm text-gray-800 dark:text-white' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'} px-4 py-1.5 rounded-md text-sm font-medium transition-all duration-200">我的收藏</button>
+                            <button onclick="app.switchTab('history')" class="${this.state.tab === 'history' ? 'bg-white dark:bg-gray-600 shadow-sm text-gray-800 dark:text-white' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'} px-4 py-1.5 rounded-md text-sm font-medium transition-all duration-200">历史记录</button>
+                        </div>
+                    </div>
+                `;
+
+                let contentHtml = '';
+
+                // Loading Overlay
+                if (this.state.isLoading) {
+                    contentHtml = `
+                        <div class="flex flex-col items-center justify-center flex-1 animate-fade-in h-64">
+                            <svg class="animate-spin h-10 w-10 text-mac-blue mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            <p class="text-gray-500 font-medium">AI 正在生成内容...</p>
+                            <p class="text-xs text-gray-400 mt-2">首次生成可能需要几秒钟</p>
+                        </div>
+                    `;
+                } else if (this.state.tab === 'new') {
+                    const len = this.state.practiceLength;
+                    const lenLabel = len === 'SHORT' ? '短' : (len === 'MEDIUM' ? '中' : '长');
+                    
+                    contentHtml = `
+                        <div class="flex flex-col items-center gap-6 animate-fade-in w-full overflow-y-auto flex-1 pb-4">
+                            <div class="w-full max-w-2xl mb-6 flex items-center justify-end gap-3 shrink-0">
+                                <span class="text-xs text-gray-400 font-medium uppercase tracking-wider">练习长度</span>
+                                <div class="bg-gray-100 dark:bg-gray-800 p-0.5 rounded-lg flex">
+                                    <button onclick="app.setPracticeLength('SHORT')" class="${len === 'SHORT' ? 'bg-white dark:bg-gray-600 shadow-sm text-gray-800 dark:text-white' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'} px-3 py-1 rounded-md text-xs font-medium transition-all">短</button>
+                                    <button onclick="app.setPracticeLength('MEDIUM')" class="${len === 'MEDIUM' ? 'bg-white dark:bg-gray-600 shadow-sm text-gray-800 dark:text-white' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'} px-3 py-1 rounded-md text-xs font-medium transition-all">中</button>
+                                    <button onclick="app.setPracticeLength('LONG')" class="${len === 'LONG' ? 'bg-white dark:bg-gray-600 shadow-sm text-gray-800 dark:text-white' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'} px-3 py-1 rounded-md text-xs font-medium transition-all">长</button>
+                                </div>
+                            </div>
+
+                            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 w-full max-w-2xl shrink-0">
+                                <button onclick="app.handleStandardMode('WORDS')" class="p-6 rounded-xl border border-gray-200 dark:border-gray-700 hover:border-mac-blue hover:shadow-lg hover:shadow-mac-blue/10 transition-all bg-white dark:bg-gray-800 text-center group relative overflow-hidden">
+                                    <div class="absolute top-2 right-2 text-[10px] text-mac-blue bg-blue-50 dark:bg-blue-900/30 px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity">AI 驱动</div>
+                                    <div class="text-2xl mb-2 group-hover:scale-110 transition-transform">🎲</div>
+                                    <h3 class="font-bold text-gray-800 dark:text-gray-100 group-hover:text-mac-blue">随机词汇</h3>
+                                    <p class="text-xs text-gray-400 mt-2">AI 生成随机常用词</p>
+                                </button>
+                                <button onclick="app.handleStandardMode('IDIOMS')" class="p-6 rounded-xl border border-gray-200 dark:border-gray-700 hover:border-mac-blue hover:shadow-lg hover:shadow-mac-blue/10 transition-all bg-white dark:bg-gray-800 text-center group relative overflow-hidden">
+                                    <div class="absolute top-2 right-2 text-[10px] text-mac-blue bg-blue-50 dark:bg-blue-900/30 px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity">AI 驱动</div>
+                                    <div class="text-2xl mb-2 group-hover:scale-110 transition-transform">📖</div>
+                                    <h3 class="font-bold text-gray-800 dark:text-gray-100 group-hover:text-mac-blue">四字成语</h3>
+                                    <p class="text-xs text-gray-400 mt-2">AI 生成经典成语</p>
+                                </button>
+                                <button onclick="app.handleStandardMode('SENTENCES')" class="p-6 rounded-xl border border-gray-200 dark:border-gray-700 hover:border-mac-blue hover:shadow-lg hover:shadow-mac-blue/10 transition-all bg-white dark:bg-gray-800 text-center group relative overflow-hidden">
+                                    <div class="absolute top-2 right-2 text-[10px] text-mac-blue bg-blue-50 dark:bg-blue-900/30 px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity">AI 驱动</div>
+                                    <div class="text-2xl mb-2 group-hover:scale-110 transition-transform">📜</div>
+                                    <h3 class="font-bold text-gray-800 dark:text-gray-100 group-hover:text-mac-blue">优美短句</h3>
+                                    <p class="text-xs text-gray-400 mt-2">AI 生成名言警句</p>
+                                </button>
+                            </div>
+                            
+                            <div class="w-full max-w-2xl mt-4 shrink-0">
+                                <div class="border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 p-6 shadow-sm transition-all hover:shadow-md">
+                                    <div class="flex items-center gap-2 mb-4">
+                                        <span class="text-xl">✨</span>
+                                        <h3 class="font-bold text-gray-800 dark:text-gray-100">自定义主题生成</h3>
+                                    </div>
+                                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                                        <div class="col-span-2">
+                                            <input id="ai-topic" type="text" placeholder="输入主题，如：科技、散文..." value="科技" class="w-full px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-mac-blue outline-none text-sm dark:text-white transition-all">
+                                        </div>
+                                        <div>
+                                            <select id="ai-length" class="w-full px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-mac-blue outline-none text-sm dark:text-white cursor-pointer">
+                                                <option value="50">约 50 字</option>
+                                                <option value="100" selected>约 100 字</option>
+                                                <option value="200">约 200 字</option>
+                                                <option value="300">约 300 字</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <button onclick="app.handleCustomAIGenerate()" class="w-full py-2.5 bg-mac-blue hover:bg-blue-600 text-white rounded-lg font-medium text-sm transition-all shadow-lg shadow-blue-500/20 flex items-center justify-center gap-2">
+                                        开始生成并练习
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                } else if (this.state.tab === 'library') {
+                     contentHtml = this.state.library.length === 0 ? 
+                        `<div class="flex flex-col items-center justify-center flex-1 text-gray-400"><div class="text-4xl mb-2">📂</div><p>暂无收藏</p></div>` :
+                        `<div class="w-full max-w-3xl mx-auto flex-1 overflow-y-auto pr-2 grid gap-3 content-start">
+                            ${this.state.library.map(item => `
+                                <div class="bg-white dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-mac-blue/50 flex justify-between items-center group transition-all">
+                                    <div class="flex-1 min-w-0 mr-4">
+                                        <h4 class="font-bold text-gray-800 dark:text-gray-100 truncate">${item.title}</h4>
+                                        <p class="text-xs text-gray-400 mt-1 truncate">${item.content}</p>
+                                    </div>
+                                    <div class="flex gap-2">
+                                        <button onclick="app.startPractice('CUSTOM', '${item.content}', '${item.title}')" class="px-3 py-1 bg-mac-blue text-white text-xs rounded">练习</button>
+                                        <button onclick="app.deleteLibraryItem(${item.id})" class="px-2 py-1 text-red-500 text-xs hover:bg-red-50 dark:hover:bg-red-900/20 rounded">删除</button>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>`;
+                } else if (this.state.tab === 'history') {
+                    contentHtml = this.state.history.length === 0 ?
+                        `<div class="flex flex-col items-center justify-center flex-1 text-gray-400"><div class="text-4xl mb-2">📊</div><p>暂无记录</p></div>` :
+                        `<div class="w-full max-w-4xl mx-auto flex-1 overflow-y-auto border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800">
+                            <table class="w-full text-sm text-left">
+                                <thead class="bg-gray-50 dark:bg-gray-900/50 text-gray-500 sticky top-0 z-10">
+                                    <tr><th class="px-4 py-3">时间</th><th class="px-4 py-3">模式</th><th class="px-4 py-3">速度</th><th class="px-4 py-3">准确率</th><th class="px-4 py-3 text-right"></th></tr>
+                                </thead>
+                                <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
+                                    ${this.state.history.map(item => `
+                                        <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                                            <td class="px-4 py-3 text-gray-400 text-xs">${new Date(item.date).toLocaleDateString()}</td>
+                                            <td class="px-4 py-3 truncate max-w-[120px] dark:text-gray-200">${item.mode}</td>
+                                            <td class="px-4 py-3 font-mono text-mac-blue font-bold">${item.wpm}</td>
+                                            <td class="px-4 py-3 font-mono ${item.accuracy>=95?'text-mac-green':'text-mac-yellow'}">${item.accuracy}%</td>
+                                            <td class="px-4 py-3 text-right"><button onclick="app.deleteHistory(${item.id})" class="text-gray-400 hover:text-red-500">×</button></td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>`;
+                }
+                this.dom.content.innerHTML = tabsHtml + contentHtml;
+            }
+
+            renderGame() {
+                this.dom.title.textContent = this.state.targetTitle || '练习模式';
+                this.dom.content.innerHTML = `
+                    <div class="flex flex-col h-full cursor-text" onclick="document.getElementById('hidden-input').focus()">
+                        <!-- Top Bar -->
+                        <div class="flex justify-between items-center mb-6 p-3 bg-gray-50/50 dark:bg-gray-800/30 rounded-lg border border-gray-100 dark:border-gray-700/50 shrink-0">
+                            <div class="flex gap-6 items-center">
+                                <div class="flex flex-col"><span class="text-[10px] uppercase text-gray-400 font-bold">WPM</span><span id="stat-wpm" class="text-xl font-mono font-bold text-mac-blue">0</span></div>
+                                <div class="flex flex-col"><span class="text-[10px] uppercase text-gray-400 font-bold">ACC</span><span id="stat-acc" class="text-xl font-mono font-bold text-mac-green">100%</span></div>
+                            </div>
+                            <div class="flex items-center gap-3">
+                                <div class="flex items-center bg-gray-200 dark:bg-gray-700 rounded-md p-1 gap-1">
+                                    <button onclick="app.changeFontSize(-1)" class="w-6 h-6 flex items-center justify-center text-xs text-gray-600 dark:text-gray-300 hover:bg-white dark:hover:bg-gray-600 rounded">A-</button>
+                                    <span id="font-size-display" class="text-[10px] text-gray-400 w-4 text-center">${this.state.fontSizeLevel}</span>
+                                    <button onclick="app.changeFontSize(1)" class="w-6 h-6 flex items-center justify-center text-xs text-gray-600 dark:text-gray-300 hover:bg-white dark:hover:bg-gray-600 rounded">A+</button>
+                                </div>
+                                <button onclick="app.renderMenu()" class="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 px-3 py-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700">退出</button>
+                            </div>
+                        </div>
+
+                        <!-- Typing Board -->
+                        <div class="flex-1 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6 overflow-y-auto shadow-inner relative" id="scroll-container" onclick="document.getElementById('hidden-input').focus()">
+                           <div id="game-board" class="flex flex-wrap content-start gap-y-20 gap-x-1 outline-none pb-20"></div>
+                           <input id="hidden-input" type="text" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+                        </div>
+                        
+                        <!-- Pause Overlay -->
+                        <div id="pause-overlay" class="hidden absolute inset-0 bg-white/60 dark:bg-black/60 backdrop-blur-sm z-20 flex items-center justify-center rounded-lg">
+                            <div class="text-center"><h3 class="text-2xl font-bold text-gray-800 dark:text-white mb-2">已暂停</h3><p class="text-sm text-gray-600 dark:text-gray-300">按空格键继续</p></div>
+                        </div>
+                    </div>
+                `;
+                this.renderText();
+                const input = document.getElementById('hidden-input');
+                input.focus();
+                
+                input.addEventListener('compositionstart', () => { this.isComposing = true; });
+                input.addEventListener('compositionupdate', (e) => { this.state.compositionText = e.data; this.renderText(); });
+                input.addEventListener('compositionend', (e) => { 
+                    this.isComposing = false; 
+                    if (e.data) { this.handleInput(e.data); }
+                    this.state.compositionText = ''; input.value = ''; this.renderText();
+                });
+                input.addEventListener('input', (e) => { 
+                    if (this.isComposing) { this.state.compositionText = e.target.value; this.renderText(); }
+                    else if (e.target.value) { this.handleInput(e.target.value); e.target.value = ''; this.state.compositionText = ''; this.renderText(); }
+                });
+                input.addEventListener('keydown', (e) => {
+                    if (e.key === 'Backspace' && input.value === '' && this.state.userInput.length > 0) {
+                        this.state.userInput = this.state.userInput.slice(0, -1); this.renderText();
+                    }
+                });
+                input.addEventListener('blur', () => {
+                   if(this.state.status === 'RUNNING' && document.hasFocus()) setTimeout(() => { if(document.activeElement !== input && this.state.view === 'game') input.focus(); }, 10);
+                });
+            }
+
+            renderText() {
+                const board = document.getElementById('game-board');
+                if (!board) return;
+                const target = this.state.targetText;
+                const user = this.state.userInput;
+                const comp = this.state.compositionText;
+                const sizeLevel = this.state.fontSizeLevel || 3;
+                
+                // Fixed Dimensions
+                let dims = { w: 'w-10', h: 'h-24', tText: 'text-xl', tH: 'h-10', bH: 'h-10' };
+                if(sizeLevel===1) dims={w:'w-10',h:'h-24',tText:'text-xl',tH:'h-10',bH:'h-12'};
+                if(sizeLevel===2) dims={w:'w-12',h:'h-28',tText:'text-2xl',tH:'h-12',bH:'h-14'};
+                if(sizeLevel===3) dims={w:'w-14',h:'h-32',tText:'text-3xl',tH:'h-14',bH:'h-16'};
+                if(sizeLevel===4) dims={w:'w-16',h:'h-36',tText:'text-4xl',tH:'h-16',bH:'h-18'};
+                if(sizeLevel===5) dims={w:'w-20',h:'h-40',tText:'text-5xl',tH:'h-20',bH:'h-20'};
+
+                let html = '';
+                for (let i = 0; i < target.length; i++) {
+                    const tChar = target[i];
+                    let uChar = '', uClass = '', boxClass = `char-unit flex flex-col items-center justify-between ${dims.w} ${dims.h} p-1 rounded-lg shrink-0`;
+                    let tClass = `${dims.tText} font-chinese text-gray-400 flex items-center justify-center ${dims.tH} w-full select-none`;
+                    let isCurrent = (i === user.length);
+
+                    if (i < user.length) {
+                        uChar = user[i];
+                        if (uChar === tChar) {
+                            uClass = `${dims.tText} font-chinese text-gray-800 dark:text-gray-100 font-bold`;
+                            tClass = tClass.replace('text-gray-400', 'text-gray-300 dark:text-gray-600 opacity-40');
+                        } else {
+                            uClass = `${dims.tText} font-chinese text-mac-red dark:text-red-400 font-bold`;
+                            tClass = tClass.replace('text-gray-400', 'text-mac-red dark:text-red-400 opacity-80');
+                            boxClass += ' bg-red-50 dark:bg-red-900/20';
+                        }
+                    } else if (isCurrent) {
+                        boxClass += ' bg-mac-blue/5 dark:bg-blue-500/10 ring-1 ring-mac-blue/30 shadow-sm z-10';
+                        tClass = tClass.replace('text-gray-400', 'text-mac-blue dark:text-blue-400 font-bold scale-110');
+                        if (comp) {
+                            uChar = comp;
+                            uClass = 'absolute bottom-2 text-sm font-sans font-medium text-mac-blue dark:text-blue-300 border-b-2 border-mac-blue px-1 whitespace-nowrap bg-white/90 dark:bg-gray-800/90 shadow-sm z-20';
+                        }
+                    } else {
+                        uChar = '&nbsp;'; uClass = `${dims.tText} invisible`;
+                    }
+                    
+                    const inputContent = (isCurrent && !comp) ? `<div class="w-8 h-1 bg-mac-blue rounded-full shadow-lg shadow-blue-500/50 animate-pulse absolute bottom-3"></div>` : `<div class="${uClass}">${uChar}</div>`;
+                    
+                    html += `<div id="char-${i}" class="${boxClass}"><div class="${tClass}">${tChar}</div><div class="flex items-center justify-center ${dims.bH} w-full relative">${inputContent}</div></div>`;
+                }
+                board.innerHTML = html;
+
+                // Sync Input Position
+                const activeEl = document.getElementById(`char-${user.length}`);
+                const inputEl = document.getElementById('hidden-input');
+                const container = document.getElementById('scroll-container');
+                if (activeEl && inputEl) {
+                    inputEl.style.top = (activeEl.offsetTop + activeEl.offsetHeight - 20) + 'px'; // Bottom anchor
+                    inputEl.style.left = activeEl.offsetLeft + 'px';
+                    inputEl.style.width = activeEl.offsetWidth + 'px';
+                    
+                    if (container) {
+                        const scrollTarget = activeEl.offsetTop - (container.offsetHeight / 2) + (activeEl.offsetHeight / 2);
+                        if (Math.abs(container.scrollTop - scrollTarget) > 60) container.scrollTo({ top: scrollTarget, behavior: 'smooth' });
+                    }
+                }
+            }
+
+            renderResult() {
+                this.state.view = 'result';
+                this.dom.title.textContent = '练习报告';
+                const analysis = this.getAnalysis(this.state.wpm, this.state.accuracy);
+                const canSave = this.state.targetText.length > 0;
+
+                this.dom.content.innerHTML = `
+                    <div class="h-full flex flex-col items-center justify-center animate-slide-up px-4 flex-1 overflow-y-auto">
+                        <div class="bg-mac-green/10 w-16 h-16 rounded-full flex items-center justify-center mb-6 shrink-0"><span class="text-3xl">🎉</span></div>
+                        <h2 class="text-3xl font-bold text-gray-800 dark:text-white mb-2 shrink-0">练习完成</h2>
+                        <p class="text-sm text-gray-500 mb-8 shrink-0 text-center">${this.state.targetTitle}</p>
+                        
+                        <div class="grid grid-cols-3 gap-4 sm:gap-6 w-full max-w-xl mb-6 shrink-0">
+                            <div class="flex flex-col items-center p-4 bg-gray-50 dark:bg-gray-800 rounded-xl"><span class="text-xs text-gray-500 uppercase font-bold tracking-wider mb-2">速度</span><span class="text-3xl font-mono font-bold text-mac-blue">${this.state.wpm}</span><span class="text-xs text-gray-400 mt-1">WPM</span></div>
+                            <div class="flex flex-col items-center p-4 bg-gray-50 dark:bg-gray-800 rounded-xl"><span class="text-xs text-gray-500 uppercase font-bold tracking-wider mb-2">准确率</span><span class="text-3xl font-mono font-bold text-mac-green">${this.state.accuracy}%</span><span class="text-xs text-gray-400 mt-1">错误: ${this.state.errors}</span></div>
+                            <div class="flex flex-col items-center p-4 bg-gray-50 dark:bg-gray-800 rounded-xl"><span class="text-xs text-gray-500 uppercase font-bold tracking-wider mb-2">字数</span><span class="text-3xl font-mono font-bold text-gray-700 dark:text-gray-300">${this.state.targetText.length}</span><span class="text-xs text-gray-400 mt-1">总字数</span></div>
+                        </div>
+
+                        <div class="w-full max-w-xl bg-blue-50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-800/30 p-4 rounded-xl mb-8 flex gap-4 items-start shrink-0">
+                             <div class="text-2xl pt-0.5">💡</div>
+                             <div><h4 class="font-bold text-sm ${analysis.color} mb-1">${analysis.title}</h4><p class="text-sm text-gray-600 dark:text-gray-300 leading-relaxed">${analysis.content}</p></div>
+                        </div>
+
+                        <div class="flex flex-wrap justify-center gap-4 shrink-0 pb-6">
+                             ${canSave ? `<button id="btn-save-text" onclick="app.saveCurrentText()" class="px-6 py-2.5 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-200 rounded-lg font-medium hover:bg-gray-50 dark:hover:bg-gray-600">⭐ 收藏</button>` : ''}
+                            <button onclick="app.startPractice(app.state.mode, app.state.targetText, app.state.targetTitle)" class="px-6 py-2.5 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-200 rounded-lg font-medium hover:bg-gray-50 dark:hover:bg-gray-600">重练</button>
+                            <button onclick="app.renderMenu()" class="px-6 py-2.5 bg-mac-blue text-white rounded-lg font-medium hover:bg-blue-600 shadow-lg shadow-blue-500/20">新练习</button>
+                        </div>
+                    </div>
+                `;
+            }
+        }
+
+        window.app = new App();
+    </script>
+</body>
+</html>
