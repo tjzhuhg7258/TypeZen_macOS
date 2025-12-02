@@ -2,6 +2,17 @@
 
 A refined, single-file Chinese typing practice application designed for macOS and iPad. Features real-time AI content generation via Google Gemini, history tracking, and a native-like typing experience.
 
+## Live Demo
+👉 **[Click here to open your App](https://tjzhuhg7258.github.io/TypeZen/)**
+
+## ⚠️ Important Deployment Step
+
+If you see a **404 error** or **White/Black screen**:
+
+1. Make sure your `index.html` file is in the **Root** (main) folder of your repository.
+2. If it is inside a folder like `components/`, **move it out** to the top level.
+3. Delete any other conflicting files like `index.tsx` or `App.tsx`.
+
 ## Features
 
 - **AI-Powered Content**: Standard modes (Words, Idioms, Sentences) and Custom topics are generated in real-time using Google Gemini API.
@@ -10,19 +21,18 @@ A refined, single-file Chinese typing practice application designed for macOS an
 - **Progress Tracking**: Local storage saves your history, stats (WPM/Accuracy), and favorite texts.
 - **Zero Backend**: Runs entirely in the browser.
 
-## How to Deploy (Free via GitHub Pages)
+## How to Activate (One-Time Setup)
 
-1. **Fork or Create Repo**: Create a new public repository on GitHub.
-2. **Upload**: Upload the `index.html` file to the root of your repository.
-3. **Enable Pages**:
-   - Go to **Settings** > **Pages**.
-   - Under **Build and deployment** > **Branch**, select `main` (or `master`) and `/ (root)`.
-   - Click **Save**.
-4. **Access**: Wait a minute, then visit the URL provided by GitHub (e.g., `https://yourusername.github.io/your-repo/`).
+Since you have already uploaded the files to GitHub, follow these steps to make the link work:
+
+1. Go to your repository settings: [Settings > Pages](https://github.com/tjzhuhg7258/TypeZen/settings/pages)
+2. Under **Build and deployment** > **Branch**, select `main` (or `master`) and `/ (root)`.
+3. Click **Save**.
+4. Wait about 60 seconds, then click the **Live Demo** link above.
 
 ## How to Use on iPad
 
-1. Open the deployed GitHub Pages URL in **Safari**.
+1. Open `https://tjzhuhg7258.github.io/TypeZen/` in **Safari**.
 2. Tap the **Share** button (square with arrow).
 3. Select **Add to Home Screen**.
 4. Launch from your home screen for a full-screen app experience.
