@@ -443,6 +443,19 @@
                 }
             }
 
+            handleCustomPaste() {
+                const input = document.getElementById('custom-paste-text');
+                const text = input ? input.value.trim() : '';
+                
+                if (!text) {
+                    alert("请先输入或粘贴需要练习的文本内容");
+                    return;
+                }
+                
+                const title = "自定义: " + (text.length > 8 ? text.substring(0, 8) + '...' : text);
+                this.startPractice('CUSTOM', text, title);
+            }
+
             useFallbackData(mode, lenSetting) {
                 let count = 20;
                 let text = "";
@@ -469,9 +482,15 @@
             startPractice(mode, text, title) {
                 this.state.mode = mode;
                 // Pre-process text to remove common problematic characters for typing
-                this.state.targetText = text.replace(/\s+/g, '').replace(/[^\u4e00-\u9fa5，。？！：；“”‘’（）]/g, ''); 
+                // Allow user to paste text with punctuation
+                this.state.targetText = text.replace(/\s+/g, '').replace(/[^\u4e00-\u9fa5，。？！：；“”‘’（）【】《》、]/g, ''); 
                 this.state.targetTitle = title;
                 
+                if (this.state.targetText.length === 0) {
+                    alert("无法识别有效的中文字符。请粘贴中文文本。");
+                    return;
+                }
+
                 this.state.userInput = '';
                 this.state.compositionText = '';
                 this.state.status = 'RUNNING'; 
@@ -713,6 +732,19 @@
                                     </div>
                                     <button onclick="app.handleCustomAIGenerate()" class="w-full py-2.5 bg-mac-blue hover:bg-blue-600 text-white rounded-lg font-medium text-sm transition-all shadow-lg shadow-blue-500/20 flex items-center justify-center gap-2">
                                         开始生成并练习
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="w-full max-w-2xl mt-4 shrink-0">
+                                <div class="border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 p-6 shadow-sm transition-all hover:shadow-md">
+                                    <div class="flex items-center gap-2 mb-4">
+                                        <span class="text-xl">📋</span>
+                                        <h3 class="font-bold text-gray-800 dark:text-gray-100">粘贴自定义文本</h3>
+                                    </div>
+                                    <textarea id="custom-paste-text" placeholder="在此粘贴您想练习的中文文章、段落..." class="w-full h-24 px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-mac-blue outline-none text-sm dark:text-white transition-all resize-none mb-4"></textarea>
+                                    <button onclick="app.handleCustomPaste()" class="w-full py-2.5 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-200 rounded-lg font-medium hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors shadow-sm">
+                                        开始练习
                                     </button>
                                 </div>
                             </div>
