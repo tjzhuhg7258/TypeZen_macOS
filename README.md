@@ -3,7 +3,7 @@
 A refined, single-file Chinese typing practice application designed for macOS and iPad. Features real-time AI content generation via Google Gemini, history tracking, and a native-like typing experience.
 
 ## Live Demo
-👉 **[Click here to open your App](https://tjzhuhg7258.github.io/TypeZen/)**
+👉 **[Click here to open your App](https://tjzhuhg7258.github.io/TypeZen_macOS/)**
 
 ## ⚠️ Important Deployment Step
 
