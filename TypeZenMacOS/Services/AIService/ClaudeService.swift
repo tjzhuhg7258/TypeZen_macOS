@@ -12,12 +12,12 @@ class ClaudeService: AIServiceProtocol {
     private let baseURL = "https://api.anthropic.com/v1/messages"
     
     // MARK: - 生成打字练习文本
-    func generatePracticeText(mode: String, difficulty: Int, count: Int, sourceMaterial: String?) async throws -> [String] {
+    func generatePracticeText(mode: String, difficulty: Int, count: Int, topic: String?, sourceMaterial: String?) async throws -> [String] {
         guard let apiKey = KeychainManager.shared.load(for: "claude_api_key") else {
             throw AIServiceError.notConfigured
         }
         
-        let prompt = buildPrompt(mode: mode, difficulty: difficulty, count: count, sourceMaterial: sourceMaterial)
+        let prompt = buildPrompt(mode: mode, difficulty: difficulty, count: count, topic: topic, sourceMaterial: sourceMaterial)
         let response = try await callAPI(prompt: prompt, apiKey: apiKey)
         
         return parseResponse(response, mode: mode)
@@ -37,7 +37,7 @@ class ClaudeService: AIServiceProtocol {
     
     // MARK: - Private Methods
     
-    private func buildPrompt(mode: String, difficulty: Int, count: Int, sourceMaterial: String?) -> String {
+    private func buildPrompt(mode: String, difficulty: Int, count: Int, topic: String?, sourceMaterial: String?) -> String {
         if let sourceMaterial, !sourceMaterial.isEmpty {
             return """
             你将获得网页正文，请提炼核心内容并生成中文打字练习短文。
@@ -47,6 +47,9 @@ class ClaudeService: AIServiceProtocol {
             \(sourceMaterial)
             """
         }
+
+        let trimmedTopic = topic?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let topicClause = trimmedTopic.isEmpty ? "" : "主题围绕\(trimmedTopic)。"
         
         switch mode {
         case "words":
@@ -55,6 +58,8 @@ class ClaudeService: AIServiceProtocol {
             return "请生成 \(count) 个常用的四字成语，难度级别 \(difficulty)/5。直接输出成语列表，用空格分隔，不要编号和解释。"
         case "sentences":
             return "请生成 \(count) 条适合打字练习的中文句子，难度级别 \(difficulty)/5。要求：每句10-30字，使用常用汉字，内容积极向上。直接输出句子，每句一行。"
+        case "article", "articles":
+            return "请生成一篇约\(count)字的中文打字练习短文。\(topicClause)难度级别 \(difficulty)/5。要求：语言自然、结构完整、使用常用汉字与标点，仅输出正文。"
         default:
             return "请生成适合中文打字练习的文本内容"
         }
@@ -116,6 +121,8 @@ class ClaudeService: AIServiceProtocol {
         if mode == "sentences" {
             return text.components(separatedBy: .newlines)
                 .filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
+        } else if mode == "article" || mode == "articles" {
+            return [text]
         } else {
             return text.components(separatedBy: .whitespaces)
                 .filter { !$0.isEmpty }

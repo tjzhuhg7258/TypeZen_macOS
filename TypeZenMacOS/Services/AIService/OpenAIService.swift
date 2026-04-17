@@ -12,12 +12,12 @@ class OpenAIService: AIServiceProtocol {
     private let model = "gpt-4o-mini"
     
     // MARK: - 生成打字练习文本
-    func generatePracticeText(mode: String, difficulty: Int, count: Int, sourceMaterial: String?) async throws -> [String] {
+    func generatePracticeText(mode: String, difficulty: Int, count: Int, topic: String?, sourceMaterial: String?) async throws -> [String] {
         guard let apiKey = KeychainManager.shared.load(for: "openai_api_key") else {
             throw AIServiceError.notConfigured
         }
         
-        let prompt = buildPrompt(mode: mode, difficulty: difficulty, count: count, sourceMaterial: sourceMaterial)
+        let prompt = buildPrompt(mode: mode, difficulty: difficulty, count: count, topic: topic, sourceMaterial: sourceMaterial)
         let response = try await callAPI(prompt: prompt, apiKey: apiKey)
         
         return parseResponse(response, mode: mode)
@@ -37,7 +37,7 @@ class OpenAIService: AIServiceProtocol {
     
     // MARK: - Private Methods
     
-    private func buildPrompt(mode: String, difficulty: Int, count: Int, sourceMaterial: String?) -> String {
+    private func buildPrompt(mode: String, difficulty: Int, count: Int, topic: String?, sourceMaterial: String?) -> String {
         if let sourceMaterial, !sourceMaterial.isEmpty {
             return """
             请基于以下网页内容进行总结，生成适合中文打字练习的短文。
@@ -47,6 +47,9 @@ class OpenAIService: AIServiceProtocol {
             \(sourceMaterial)
             """
         }
+
+        let trimmedTopic = topic?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let topicClause = trimmedTopic.isEmpty ? "" : "主题围绕\(trimmedTopic)。"
         
         switch mode {
         case "words":
@@ -55,6 +58,8 @@ class OpenAIService: AIServiceProtocol {
             return "请生成 \(count) 个常用的四字成语，难度级别 \(difficulty)/5。直接输出成语列表，用空格分隔，不要编号和解释。"
         case "sentences":
             return "请生成 \(count) 条适合打字练习的中文句子，难度级别 \(difficulty)/5。要求：每句10-30字，使用常用汉字，内容积极向上。直接输出句子，每句一行。"
+        case "article", "articles":
+            return "请生成一篇约\(count)字的中文打字练习短文。\(topicClause)难度级别 \(difficulty)/5。要求：语句流畅自然，使用常用汉字和标点，直接输出正文，不要标题和解释。"
         default:
             return "请生成适合中文打字练习的文本内容"
         }
@@ -109,6 +114,8 @@ class OpenAIService: AIServiceProtocol {
         if mode == "sentences" {
             return content.components(separatedBy: .newlines)
                 .filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
+        } else if mode == "article" || mode == "articles" {
+            return [content]
         } else {
             return content.components(separatedBy: .whitespaces)
                 .filter { !$0.isEmpty }

@@ -220,11 +220,13 @@ struct HomeView: View {
     
     private func generateAIText() async {
         isGenerating = true
+        defer { isGenerating = false }
         do {
             let result = try await AIServiceManager.shared.generatePracticeText(
                 mode: "articles",
                 difficulty: difficulty,
                 count: wordCount,
+                topic: customTopic,
                 sourceURL: sourceURL
             )
             customText = result.joined(separator: " ")
@@ -232,7 +234,6 @@ struct HomeView: View {
             errorMessage = error.localizedDescription
             showError = true
         }
-        isGenerating = false
     }
     
     private func saveToFavorites() {

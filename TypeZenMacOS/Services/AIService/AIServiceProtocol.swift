@@ -14,7 +14,7 @@ protocol AIServiceProtocol {
     ///   - difficulty: 难度级别 (1-5)
     ///   - count: 生成数量
     /// - Returns: 生成的文本数组
-    func generatePracticeText(mode: String, difficulty: Int, count: Int, sourceMaterial: String?) async throws -> [String]
+    func generatePracticeText(mode: String, difficulty: Int, count: Int, topic: String?, sourceMaterial: String?) async throws -> [String]
     
     /// 生成自定义主题文本
     /// - Parameter prompt: 用户提示词

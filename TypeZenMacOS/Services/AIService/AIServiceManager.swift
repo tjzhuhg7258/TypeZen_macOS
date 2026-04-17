@@ -27,8 +27,7 @@ class AIServiceManager: ObservableObject {
     }
     
     // MARK: - 生成打字练习文本（带回退机制）
-    func generatePracticeText(mode: String, difficulty: Int = 3, count: Int = 10, sourceURL: String? = nil) async throws -> [String] {
-        let normalizedMode = normalizeMode(mode)
+    func generatePracticeText(mode: String, difficulty: Int = 3, count: Int = 10, topic: String? = nil, sourceURL: String? = nil) async throws -> [String] {
         let sourceMaterial = try await fetchSourceMaterialIfNeeded(sourceURL)
         
         // 按优先级尝试每个已配置的服务
@@ -38,15 +37,16 @@ class AIServiceManager: ObservableObject {
         
         if configuredServices.isEmpty {
             // 如果没有配置 AI 服务，返回内置词库
-            return getFallbackText(mode: normalizedMode, count: count)
+            return getFallbackText(mode: mode, count: count, topic: topic)
         }
         
         for (name, service) in configuredServices {
             do {
                 let result = try await service.generatePracticeText(
-                    mode: normalizedMode,
+                    mode: mode,
                     difficulty: difficulty,
                     count: count,
+                    topic: topic,
                     sourceMaterial: sourceMaterial
                 )
                 if !result.isEmpty {
@@ -61,7 +61,7 @@ class AIServiceManager: ObservableObject {
         
         // 所有 AI 服务都失败，回退到内置词库
         print("所有 AI 服务都失败，使用内置词库")
-        return getFallbackText(mode: normalizedMode, count: count)
+        return getFallbackText(mode: mode, count: count, topic: topic)
     }
     
     // MARK: - 生成自定义文本（带回退机制）
@@ -123,16 +123,7 @@ class AIServiceManager: ObservableObject {
     
     // MARK: - 内置词库回退
     
-    private func normalizeMode(_ mode: String) -> String {
-        switch mode.lowercased() {
-        case "article", "articles":
-            return "sentences"
-        default:
-            return mode
-        }
-    }
-    
-    private func getFallbackText(mode: String, count: Int) -> [String] {
+    private func getFallbackText(mode: String, count: Int, topic: String?) -> [String] {
         switch mode {
         case "words":
             return Array(FallbackData.words.shuffled().prefix(count))
@@ -140,9 +131,31 @@ class AIServiceManager: ObservableObject {
             return Array(FallbackData.idioms.shuffled().prefix(count))
         case "sentences":
             return Array(FallbackData.sentences.shuffled().prefix(count))
+        case "article", "articles":
+            return [buildFallbackArticle(count: count, topic: topic)]
         default:
             return Array(FallbackData.words.shuffled().prefix(count))
         }
+    }
+
+    private func buildFallbackArticle(count: Int, topic: String?) -> String {
+        let trimmedTopic = topic?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let intro = trimmedTopic.isEmpty ? "今天我们继续进行中文打字练习。" : "今天我们围绕\(trimmedTopic)进行中文打字练习。"
+        let ending = "持续练习能够帮助我们提升专注力、熟悉常用表达，并逐步形成稳定顺畅的输入节奏。"
+        var article = intro
+
+        for sentence in FallbackData.sentences.shuffled() {
+            if article.count >= count {
+                break
+            }
+            article += sentence
+        }
+
+        if article.count < count {
+            article += ending
+        }
+
+        return String(article.prefix(max(count, 60)))
     }
     
     private func fetchSourceMaterialIfNeeded(_ sourceURL: String?) async throws -> String? {

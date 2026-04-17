@@ -1,10 +1,7 @@
 import SwiftUI
-import AppKit
 import SwiftData
 
 struct ContentView: View {
-    @Environment(\.modelContext) private var modelContext
-    
     @State private var selectedTab = 0
     @State private var selectedMode: PracticeMode?
     @State private var customText = ""
@@ -59,17 +56,12 @@ struct ContentView: View {
                 }
             }
         }
-        .onChange(of: showPractice) { _, newValue in
-            if newValue, let mode = selectedMode {
-                // 传递 modelContainer 以支持数据保存
-                PracticeWindowManager.shared.openPracticeWindow(
-                    mode: mode,
-                    customText: customText,
-                    modelContainer: modelContext.container
-                )
-                // 重置状态
-                showPractice = false
-                selectedMode = nil
+        .sheet(isPresented: $showPractice, onDismiss: {
+            selectedMode = nil
+        }) {
+            if let mode = selectedMode {
+                PracticeView(mode: mode, customText: customText)
+                    .frame(minWidth: 960, minHeight: 720)
             }
         }
     }

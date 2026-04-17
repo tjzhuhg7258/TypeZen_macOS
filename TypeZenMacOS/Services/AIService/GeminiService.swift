@@ -13,12 +13,12 @@ class GeminiService: AIServiceProtocol {
     private let baseURL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
     
     // MARK: - 生成打字练习文本
-    func generatePracticeText(mode: String, difficulty: Int, count: Int, sourceMaterial: String?) async throws -> [String] {
+    func generatePracticeText(mode: String, difficulty: Int, count: Int, topic: String?, sourceMaterial: String?) async throws -> [String] {
         guard let apiKey = KeychainManager.shared.load(for: "gemini_api_key") else {
             throw AIServiceError.notConfigured
         }
 
-        let prompt = buildPrompt(mode: mode, difficulty: difficulty, count: count, sourceMaterial: sourceMaterial)
+        let prompt = buildPrompt(mode: mode, difficulty: difficulty, count: count, topic: topic, sourceMaterial: sourceMaterial)
         let response = try await callAPI(prompt: prompt, apiKey: apiKey)
         return parseResponse(response, mode: mode)
     }
@@ -37,7 +37,7 @@ class GeminiService: AIServiceProtocol {
     
     // MARK: - Private Methods
     
-    private func buildPrompt(mode: String, difficulty: Int, count: Int, sourceMaterial: String?) -> String {
+    private func buildPrompt(mode: String, difficulty: Int, count: Int, topic: String?, sourceMaterial: String?) -> String {
         if let sourceMaterial, !sourceMaterial.isEmpty {
             return """
             你将收到一段网页内容。请先提炼核心信息，再生成适合中文打字练习的短文。
@@ -53,14 +53,11 @@ class GeminiService: AIServiceProtocol {
             \(sourceMaterial)
             """
         }
-        
-        // 检查是否有自定义主题
-        let customTopic = UserDefaults.standard.string(forKey: "practiceCustomTopic") ?? ""
-        
+
         // 如果有自定义主题，使用它；否则随机选择
         let selectedTopic: String
-        if !customTopic.isEmpty {
-            selectedTopic = customTopic
+        if let topic, !topic.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            selectedTopic = topic
         } else {
             // 不同难度对应的主题
             let topics = [
