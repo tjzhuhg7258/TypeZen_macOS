@@ -1,0 +1,8 @@
+.DS_Store
+.DerivedData/
+build/
+
+*.xcuserstate
+TypeZenMacOS.xcodeproj/project.xcworkspace/xcshareddata/
+TypeZenMacOS.xcodeproj/xcuserdata/
+TypeZenMacOS.xcodeproj/project.xcworkspace/xcuserdata/

@@ -571,6 +571,9 @@ struct TypingTextEditor: NSViewRepresentable {
     }
 }
 
-#Preview {
-    PracticeView(mode: .words, customText: "")
+struct PracticeView_Previews: PreviewProvider {
+    static var previews: some View {
+        PracticeView(mode: .words, customText: "")
+            .modelContainer(for: [PracticeSession.self, FavoriteText.self], inMemory: true)
+    }
 }
